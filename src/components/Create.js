@@ -9,11 +9,14 @@ import AddIcon from "@material-ui/icons/Add";
 import ReplayIcon from "@material-ui/icons/Replay";
 import request from "./utils";
 import { InputLabel } from "@material-ui/core";
-import { ToastContainer, toast } from "react-toastify";
 import { useSnackbar } from "notistack";
 import { SnackbarProvider } from "notistack";
-import { Warning } from "@material-ui/icons";
 import Paper from "@material-ui/core/Paper";
+import CircularProgress from "@material-ui/core/CircularProgress";
+import EditIcon from "@material-ui/icons/Edit";
+import Modal from "@material-ui/core/Modal";
+
+const CustomModal = React.lazy((r) => import("./CustomModal"));
 
 function Create(props) {
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
@@ -23,26 +26,73 @@ function Create(props) {
       field: "id",
       headerName: "ID",
       type: "number",
-      width: 180,
+      width: 150,
       editable: false,
     },
     {
       field: "name",
       headerName: "Name",
-      width: 180,
+      width: 150,
       editable: false,
     },
     {
       field: "desc",
       headerName: "Description",
-      width: 180,
+      width: 150,
       editable: false,
     },
     {
       field: "isActive",
       headerName: "Online",
-      width: 180,
+      width: 150,
       editable: false,
+    },
+    {
+      field: "1",
+      headerName: "Edit",
+      sortable: false,
+      width: 100,
+      disableClickEventBubbling: true,
+      renderCell: (params) => {
+        const onClick = () => {
+          console.log(params);
+          openModal(params.id);
+        };
+        return (
+          <Button onClick={onClick}>
+            <EditIcon color="primary" />
+          </Button>
+        );
+      },
+    },
+    {
+      field: "",
+      headerName: "Delete",
+      sortable: false,
+      width: 100,
+      disableClickEventBubbling: true,
+      renderCell: (params) => {
+        const onClick = () => {
+          console.log(params);
+          let temp = [...deleteList];
+          let rowId = params.id;
+          if (deleteList.includes(rowId)) {
+            let temp = deleteList.filter((r) => r !== rowId);
+            setDeleteList(temp);
+            console.log(temp);
+          } else {
+            temp.push(rowId);
+            setDeleteList(temp);
+            console.log(temp);
+          }
+        };
+        const color = deleteList.includes(params.id) ? "secondary" : "primary";
+        return (
+          <Button onClick={onClick}>
+            <DeleteIcon color={color} />
+          </Button>
+        );
+      },
     },
   ];
 
@@ -58,10 +108,7 @@ function Create(props) {
   const [showActiveUsers, setShowActiveUsers] = useState(true);
   const [showInActiveUsers, setshowInActiveUsers] = useState(true);
   const [loading, setLoading] = useState(true);
-
-  const getUser = () => toast("user retrieved!");
-  const getUserFailed = () => toast("user retrieval failed!");
-  const deleteAll = () => toast("deleted selected users!");
+  const [pageLoading, setPageLoading] = useState(true);
 
   let body = {
     name: name,
@@ -92,11 +139,14 @@ function Create(props) {
       });
   };
   useEffect(async () => {
+    setPageLoading(true);
+    setLoading(true);
     await request("/data", "GET").then((res) => {
       res.json().then((r) => setCategory(r));
       getUsers();
     });
-    setLoading(!loading);
+    setLoading(false);
+    setPageLoading(false);
   }, []);
   const checkValidity = () => {
     if ((id == null) | (id == undefined) | (id == "")) {
@@ -132,18 +182,18 @@ function Create(props) {
     }
   };
 
-  const handleDelete = (id = id) => {
+  const handleDelete = (id=id) => {
     if ((id != null) & (id.length > 0)) {
       request(`/users/${id}`, "DELETE", {})
         .then((res) => {
-          res.status == 180
-            ? alert("user deleted successfully")
-            : alert("user does not exist!");
+          res.status == 200
+            ? enqueueSnackbar("user deleted successfully")
+            : enqueueSnackbar("user does not exist!");
         })
-        .then(getUsers())
-        .catch((err) => alert("Error occurred while deleting user!", err));
+        .then(()=>{getUsers();closeModal()})
+        .catch((err) => enqueueSnackbar("Error occurred while deleting user!", err));
     } else {
-      alert("Enter id to continue!");
+      enqueueSnackbar("Enter id to continue!");
     }
   };
 
@@ -193,185 +243,216 @@ function Create(props) {
       enqueueSnackbar("Enter id to continue!", { variant: "warning" });
     }
   };
+  const handleRowSelection = (row) => {
+    let rowId = row.data.id.toString();
+    let temp = [...deleteList];
+    if (deleteList.includes(rowId)) {
+      let temp = deleteList.filter((r) => r !== rowId);
+      setDeleteList(temp);
+      console.log(temp);
+    } else {
+      temp.push(row.data.id);
+      setDeleteList(temp);
+      console.log(temp);
+    }
+  };
 
   return (
     <Container
       maxWidth={"md"}
-      style={{ paddingTop: "5vh", paddingBottom: "5vh" }}
+      style={{
+        paddingTop: "5vh",
+        paddingBottom: "5vh",
+        alignSelf: "flex-start",
+      }}
     >
-      <Paper elevation={24}>
-        <Grid
-          container
-          direction="row"
-          justifyContent="space-evenly"
-          alignItems="center"
-        >
-          <Grid item>
-            <TextField
-              variant="outlined"
-              placeholder="Id: "
-              value={id}
-              onChange={(e) => {
-                setId(e.target.value);
-                console.log(e.target.value);
-              }}
-            />
-          </Grid>
-          <Grid item>
-            <TextField
-              variant="outlined"
-              placeholder="Name: "
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                console.log(e.target.value);
-              }}
-            />
-          </Grid>
-          <Grid item>
-            <TextField
-              variant="outlined"
-              placeholder="desc: "
-              value={desc}
-              onChange={(e) => {
-                setDesc(e.target.value);
-                console.log(e.target.value);
-              }}
-            />
-          </Grid>
-          <Grid item>
-            <InputLabel for="isOnline">
-              Online
-              <Checkbox
-                color="primary"
-                id="isOnline"
-                checked={toggle}
-                onChange={() => {
-                  setToggle(!toggle);
+      {users != null && users.length > 0
+        ? users
+            .filter((x) => x.id == modalId)
+            .map((x) => (
+              <Modal
+                open={modal}
+                onClose={() => {
+                  closeModal();
                 }}
-              ></Checkbox>
-            </InputLabel>
+                aria-labelledby="simple-modal-title"
+                aria-describedby="simple-modal-description"
+              >
+                <CustomModal
+                  closeModal={closeModal}
+                  modalId={modalId}
+                  user={x}
+                  getUsers={getUsers}
+                  handleDelete={handleDelete}
+                />
+              </Modal>
+            ))
+        : null}
+
+      <>
+        <Paper elevation={24}>
+          <Grid
+            container
+            direction="row"
+            justifyContent="space-evenly"
+            alignItems="center"
+          >
+            <Grid item>
+              <TextField
+                variant="outlined"
+                placeholder="Id: "
+                value={id}
+                onChange={(e) => {
+                  setId(e.target.value);
+                  console.log(e.target.value);
+                }}
+              />
+            </Grid>
+            <Grid item>
+              <TextField
+                variant="outlined"
+                placeholder="Name: "
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  console.log(e.target.value);
+                }}
+              />
+            </Grid>
+            <Grid item>
+              <TextField
+                variant="outlined"
+                placeholder="desc: "
+                value={desc}
+                onChange={(e) => {
+                  setDesc(e.target.value);
+                  console.log(e.target.value);
+                }}
+              />
+            </Grid>
+            <Grid item>
+              <InputLabel for="isOnline">
+                Online
+                <Checkbox
+                  color="primary"
+                  id="isOnline"
+                  checked={toggle}
+                  onChange={() => {
+                    setToggle(!toggle);
+                  }}
+                ></Checkbox>
+              </InputLabel>
+            </Grid>
           </Grid>
-        </Grid>
-        <Grid
-          style={{ paddingTop: "5vh" }}
-          container
-          direction="row"
-          justifyContent="space-evenly"
-          alignItems="center"
-        >
-          <Grid item>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                handleAdd();
-              }}
-            >
-              <AddIcon />
-              add
-            </Button>
-          </Grid>
-          <Grid item>
-            <InputLabel for="showActiveUsers">
-              Show Active Users
-              <Checkbox
-                id="showActiveUsers"
+          <Grid
+            style={{ paddingTop: "5vh" }}
+            container
+            direction="row"
+            justifyContent="space-evenly"
+            alignItems="center"
+          >
+            <Grid item>
+              <Button
+                variant="contained"
                 color="primary"
-                checked={showActiveUsers}
                 onClick={() => {
-                  setShowActiveUsers(!showActiveUsers);
-                  console.log(showActiveUsers);
+                  handleAdd();
                 }}
               >
-                showactive
-              </Checkbox>
-            </InputLabel>
-          </Grid>
-          <Grid item>
-            <InputLabel for="showInActiveUsers">
-              Show InActive Users
-              <Checkbox
-                id="showInActiveUsers"
+                <AddIcon />
+                add
+              </Button>
+            </Grid>
+            <Grid item>
+              <InputLabel for="showActiveUsers">
+                Show Active Users
+                <Checkbox
+                  id="showActiveUsers"
+                  color="primary"
+                  checked={showActiveUsers}
+                  onClick={() => {
+                    setShowActiveUsers(!showActiveUsers);
+                    console.log(showActiveUsers);
+                  }}
+                >
+                  showactive
+                </Checkbox>
+              </InputLabel>
+            </Grid>
+            <Grid item>
+              <InputLabel for="showInActiveUsers">
+                Show InActive Users
+                <Checkbox
+                  id="showInActiveUsers"
+                  color="primary"
+                  checked={showInActiveUsers}
+                  onClick={() => {
+                    setshowInActiveUsers(!showInActiveUsers);
+                    console.log(showInActiveUsers);
+                  }}
+                >
+                  showactive
+                </Checkbox>
+              </InputLabel>
+            </Grid>
+            <Grid item>
+              <Button
+                variant="contained"
                 color="primary"
-                checked={showInActiveUsers}
                 onClick={() => {
-                  setshowInActiveUsers(!showInActiveUsers);
-                  console.log(showInActiveUsers);
+                  handleRetrieve();
                 }}
               >
-                showactive
-              </Checkbox>
-            </InputLabel>
+                <ReplayIcon />
+                Retrieve
+              </Button>
+            </Grid>
           </Grid>
-          <Grid item>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                handleRetrieve();
+          <div style={{ width: "100%", paddingTop: "5vh" }}>
+            <DataGrid
+              rows={users
+                .filter((item) =>
+                  item.name.includes(name.toString())
+                    ? true
+                    : name.includes(item.name)
+                    ? true
+                    : false
+                )
+                .filter((item) => {
+                  if (showActiveUsers && item.isActive == true) {
+                    return true;
+                  }
+                  if (showInActiveUsers && item.isActive == false) {
+                    return true;
+                  }
+                })
+                .map((x) => x)}
+              columns={columns}
+              pageSize={5}
+              disableSelectionOnClick
+              autoHeight={true}
+              onColumnHeaderClick={(header) => {
+                console.log(header);
+                if (header.field === "__check__") {
+                  handleDeleteAll();
+                }
               }}
-            >
-              <ReplayIcon />
-              Retrieve
-            </Button>
-          </Grid>
-        </Grid>
-        <div style={{ width: "100%", paddingTop: "5vh" }}>
-          <DataGrid
-            rows={users
-              .filter((item) =>
-                item.name.includes(name.toString())
-                  ? true
-                  : name.includes(item.name)
-                  ? true
-                  : false
-              )
-              .filter((item) => {
-                if (showActiveUsers && item.isActive == true) {
-                  return true;
-                }
-                if (showInActiveUsers && item.isActive == false) {
-                  return true;
-                }
-              })
-              .map(x=>x)
-            }
-            columns={columns}
-            pageSize={5}
-            checkboxSelection
-            disableSelectionOnClick
-            autoHeight={true}
-            onColumnHeaderClick={(header) => {
-              console.log(header);
-              if (header.field === "__check__") {
-                handleDeleteAll();
-              }
-            }}
-            onRowSelected={(row) => {
-              let rowId = row.data.id.toString();
-              let temp = deleteList;
-              if (deleteList.includes(rowId)) {
-                let temp = deleteList.filter((r) => r !== rowId);
-                setDeleteList(temp);
-                console.log(temp);
-              } else {
-                temp.push(row.data.id);
-                setDeleteList(temp);
-                console.log(temp);
-              }
-            }}
-          />
-        </div>
-        <Grid
-          container
-          style={{ paddingTop: "5vh", paddingBottom: "5vh" }}
-          direction="row"
-          justifyContent="center"
-          alignItems="center"
-        >
-          <Grid item>
-            {deleteList ? (
+              onRowSelected={(row) => {
+                handleRowSelection(row);
+              }}
+              loading={loading}
+              LoadingOverlay={<CircularProgress color="inherit" />}
+              // filterModel={}
+            />
+          </div>
+          <Grid
+            container
+            style={{ paddingTop: "5vh", paddingBottom: "5vh" }}
+            direction="row"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <Grid item>
               <Button
                 variant="contained"
                 color="primary"
@@ -380,12 +461,13 @@ function Create(props) {
                 }}
               >
                 <DeleteIcon />
-                Delete
+                {/* Delete{" " + deleteList} */}
+                Delete Selected {" "+deleteList.length}
               </Button>
-            ) : null}
+            </Grid>
           </Grid>
-        </Grid>
-      </Paper>
+        </Paper>
+      </>
     </Container>
   );
 }
